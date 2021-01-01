@@ -1,3 +1,6 @@
+# pycharm project settings
+.idea/
+
 # test class
 main.py
 test*.py
