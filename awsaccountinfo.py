@@ -61,23 +61,35 @@ def get_account_id():
     return sts_client.get_caller_identity()["Account"]
 
 
+def get_account_alias():
+    iam_client = boto3.client('iam')
+    return iam_client.list_account_aliases()['AccountAliases'][0]
+
+
 if __name__ == '__main__':
     account_id = get_account_id()
     print()
-    print("AWS account id is : " + account_id)
+    print("AWS account id : " + account_id)
+    print()
+
+    # get account alias
+    account_alias = get_account_alias()
+    print("AWS account alias : " + account_alias)
     print()
 
     # List all active regions
     active_region_list = get_regions_list()
-    print("Listing all " + str(active_region_list.__len__()) + " regions: " + str(active_region_list))
+    print("Checking all " + str(active_region_list.__len__()) + " regions: " + str(active_region_list))
     print()
 
     # List all default VPC in the account
+    print("Checking for default VPCs ==========")
     default_vpc_details = get_default_vpc_details()
     print("default vpc IDs: " + str(default_vpc_details))
     print()
 
     # Test if non-default vpc exists in the account .
+    print("Checking for non-default VPCs ==========")
     non_default_vpc_details = get_non_default_vpc_details()
     print("non-default vpc IDs: " + str(non_default_vpc_details))
     print()
