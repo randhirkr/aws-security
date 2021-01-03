@@ -1,23 +1,24 @@
 import boto3
 
+
 def get_regions_list():
     # authentication happening using default aws profile(CLI)
     ec2_client = boto3.client('ec2')
 
     region_response = ec2_client.describe_regions()
-    region_list = []
+    active_region_list = []
     # fetch all aws regions
     for region in region_response["Regions"]:
         region_name = region["RegionName"]
-        region_list.append(region_name)
+        active_region_list.append(region_name)
 
-    return region_list
+    return active_region_list
 
 
 def get_non_default_vpc_details():
     # Get VPC details by region
     # iterate region list and create region specific client
-    region_vpc_id_dict = {}
+    vpc_id_dict = {}
     region_count = 0
     for region in region_list:
         ec2_region_client = boto3.client('ec2', region_name=region)
@@ -28,15 +29,15 @@ def get_non_default_vpc_details():
             continue
         region_count = region_count + 1
         print(str(region_count) + " " + region + " " + vpc_id)
-        region_vpc_id_dict[region] = vpc_id
+        vpc_id_dict[region] = vpc_id
 
-    return region_vpc_id_dict
+    return vpc_id_dict
 
 
 def get_default_vpc_details():
     # Get VPC details by region
     # iterate region list and create region specific client
-    region_vpc_id_dict = {}
+    vpc_id_dict = {}
     region_count = 0
     for region in region_list:
         ec2_region_client = boto3.client('ec2', region_name=region)
@@ -47,9 +48,9 @@ def get_default_vpc_details():
             continue
         region_count = region_count + 1
         print(str(region_count) + " " + region + " " + vpc_id)
-        region_vpc_id_dict[region] = vpc_id
+        vpc_id_dict[region] = vpc_id
 
-    return region_vpc_id_dict
+    return vpc_id_dict
 
 
 # I needed to delete only below dependencies from default VPC for deleting default VPC
@@ -90,30 +91,66 @@ def delete_default_vpc(**region_vpc_id):
     print("deleting default VPCs done======!!!!")
 
 
+def get_account_id():
+    sts_client = boto3.client("sts")
+    return sts_client.get_caller_identity()["Account"]
+
+
+def get_account_alias():
+    iam_client = boto3.client('iam')
+    return iam_client.list_account_aliases()['AccountAliases'][0]
+
+
 if __name__ == '__main__':
+    account_id = get_account_id()
+    print()
+    print("AWS account id : " + account_id)
+    print()
+
+    # get account alias
+    account_alias = get_account_alias()
+    print("AWS account alias : " + account_alias)
+    print()
+
     region_list = get_regions_list()
-    print("Listing all " + str(region_list.__len__()) + " regions: " + str(region_list))
+    print("Checking all " + str(region_list.__len__()) + " regions: " + str(region_list))
     print()
 
-    region_vpc_id_dict = get_default_vpc_details()
-    print("default vpc IDs before deleting: "+str(region_vpc_id_dict))
+    default_vpc_id_dict = get_default_vpc_details()
+    print("default vpc IDs before cleanup : "+str(default_vpc_id_dict))
     print()
 
-    delete_vpc_dependencies(**region_vpc_id_dict)
+    # exit if no default VPC available
+    if not default_vpc_id_dict:
+        print("=== Exiting as default VPCs dont exist in this account: "+account_id+" "+account_alias)
+        exit(0)
+
+    print("Confirm once if account ID and default VPCs list printed above are correct before cleanup!")
+    print()
+    user_input = input("Enter yes to proceed and no to abort. Please enter your choice - yes/no : ")
     print()
 
-    delete_default_vpc(**region_vpc_id_dict)
-    print()
+    if user_input == "yes":
+        print("========= Start cleaning up ================")
+        delete_vpc_dependencies(**default_vpc_id_dict)
+        print()
+
+        delete_default_vpc(**default_vpc_id_dict)
+        print()
+    else:
+        print("========= Do not proceed and exit ====================")
+        exit(0)
 
     # test default vpc details post deletion
-    region_vpc_id_dict = get_default_vpc_details()
-    print("default vpc IDs post deleting: "+str(region_vpc_id_dict))
+    print("checking for default VPCs post cleanup----------")
+    default_vpc_id_dict = get_default_vpc_details()
+    print("default VPCs post cleanup : " + str(default_vpc_id_dict))
     print()
 
     # test non-default vpc details post deletion - this should not get deleted, if any.
-    region_vpc_id_dict = get_non_default_vpc_details()
-    print("non-default vpc IDs: "+str(region_vpc_id_dict))
+    print("checking for non-default VPCs post cleanup")
+    non_default_vpc_id_dict = get_non_default_vpc_details()
+    print("non-default VPCs post cleanup : " + str(non_default_vpc_id_dict))
     print()
-
 
 
